@@ -1,0 +1,17 @@
+name: Roberta_Adapter
+channels:
+  - pytorch
+  - huggingface
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pytorch
+  - torchvision
+  - torchaudio
+  - cudatoolkit=11.3
+  - transformers
+  - pandas
+  - scikit-learn
+  - pip
+  - pip:
+    - datasets

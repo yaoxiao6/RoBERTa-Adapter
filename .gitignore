@@ -1,6 +1,22 @@
+# Ignore CUDA files
 *.i
 *.ii
 *.gpu
 *.ptx
 *.cubin
 *.fatbin
+
+# Ignore files in the Dataset folder
+Dataset/
+
+# Ignore files in the domain_adaptive_pretraining folder
+domain_adaptive_pretraining/
+
+# Ignore files in the logs folder
+logs/
+
+# Ignore files in the Models folder
+Models/
+
+# Ignore files in the results folder
+results/
