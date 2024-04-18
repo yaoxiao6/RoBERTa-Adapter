@@ -20,3 +20,7 @@ Models/
 
 # Ignore files in the results folder
 results/
+
+# result model 
+finetuned_roberta/
+DATP_Class_model/

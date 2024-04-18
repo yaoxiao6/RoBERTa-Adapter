@@ -1,8 +1,6 @@
 name: Roberta_Adapter
 channels:
   - pytorch
-  - huggingface
-  - conda-forge
 dependencies:
   - python=3.9
   - pytorch
@@ -15,3 +13,4 @@ dependencies:
   - pip
   - pip:
     - datasets
+    - transformers[torch]
