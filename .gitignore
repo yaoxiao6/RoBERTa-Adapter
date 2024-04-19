@@ -24,3 +24,5 @@ results/
 # result model 
 finetuned_roberta/
 DATP_Class_model/
+domain_adapted_roberta/
+__pycache__/

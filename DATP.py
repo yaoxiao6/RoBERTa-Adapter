@@ -83,7 +83,7 @@ DATP_trainer.train()
 
 # Save the domain-adapted model and tokenizer
 DATPmodel.save_pretrained('./domain_adapted_roberta')
-tokenizer.save_pretrained('./domain_adapted_roberta')
+tokenizer.save_pretrained('./domain_adapted_roberta') # NameError: name 'tokenizer' is not defined
 
 # Load the domain-adapted RoBERTa model for sequence classification
 DATP_Class_model = RobertaForSequenceClassification.from_pretrained(DATPmodel, num_labels=len(label_dict))
