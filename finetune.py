@@ -29,7 +29,7 @@ val_labels = [label_dict[label] for label in val_labels]
 test_labels = [label_dict[label] for label in test_labels]
 
 val_texts.index = range(1, len(val_texts) + 1)
-test_texts.index = range(1, len(test_texts) + 1)
+test_texts.index = range(0, len(test_texts))
 
 
 tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
@@ -90,13 +90,13 @@ finetune_trainer = Trainer(
     eval_dataset=val_dataset,
 )
 
-finetune_trainer.train()
-
-
-
+# finetune_trainer.train()
 # Save the model and the tokenizer
-fintune_model.save_pretrained('./finetuned_roberta')
-tokenizer.save_pretrained('./finetuned_roberta')
+# fintune_model.save_pretrained('./finetuned_roberta')
+# tokenizer.save_pretrained('./finetuned_roberta')
+
+# finetune_trainer.model = 
+reload ('./finetuned_roberta')
 
 predictions = finetune_trainer.predict(test_dataset) # 这里有 bug: raise KeyError(key) from err, KeyError: 0
 pred_labels = np.argmax(predictions.predictions, axis=1)
