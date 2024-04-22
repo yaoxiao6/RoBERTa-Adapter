@@ -32,7 +32,7 @@ wandb.init(
 )
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-checkpoint_dir = "./checkpoints"
+checkpoint_dir = "./checkpoints-DAPT-run2"
 
 class Config:
     model_name = "./domain_adapted_roberta"
@@ -194,5 +194,5 @@ def evaluate(model, classifier, dataloader, checkpoint_dir):
     print(f"Test F1 Score: {f1}")
     wandb.log({"test_f1_score": f1_score})
 
-# train(base_model, classifier, train_loader, optimizer)
+train(base_model, classifier, train_loader, optimizer)
 evaluate(base_model, classifier, test_loader, checkpoint_dir)

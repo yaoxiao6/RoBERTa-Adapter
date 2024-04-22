@@ -6,6 +6,22 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 import numpy as np
 
+
+import wandb
+wandb.login()
+# start a new wandb run to track this script
+wandb.init(
+    # set the wandb project where this run will be logged
+    project="my-awesome-project",
+
+    # track hyperparameters and run metadata
+    config={
+        "Name": "RoBERTa-Adapter finetune",
+        "dataset": "problems_and_types",
+    }
+)
+
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Load the dataset
@@ -15,7 +31,6 @@ csv_file_path2 = './Dataset/problems_and_types_test.csv'
 # Read the CSV files into DataFrames
 df1 = pd.read_csv(csv_file_path1)
 df2 = pd.read_csv(csv_file_path2)
-# pritn df1 and df2
 
 # Train-test split (assuming you don't have separate training and validation sets)
 train_texts, train_labels = df1['problem+answer'], df1['type']
@@ -24,13 +39,11 @@ test_texts, val_texts, test_labels, val_labels = train_test_split(df2['problem+a
 # Unique classes
 label_dict = {label: i for i, label in enumerate(df1['type'].unique())}
 train_labels = [label_dict[label] for label in train_labels]
-
 val_labels = [label_dict[label] for label in val_labels]
 test_labels = [label_dict[label] for label in test_labels]
 
-val_texts.index = range(1, len(val_texts) + 1)
-test_texts.index = range(0, len(test_texts))
-
+val_texts.index = range(len(val_texts))
+test_texts.index = range(len(test_texts))
 
 tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
 
@@ -45,26 +58,22 @@ class TextDataset(Dataset):
         return len(self.texts)
 
     def __getitem__(self, idx):
-
-
         text = self.texts[idx]
         labels = self.labels[idx]
-
         encoding = self.tokenizer.encode_plus(
-          text,
-          add_special_tokens=True,
-          max_length=self.max_token_len,
-          return_token_type_ids=False,
-          padding='max_length',
-          truncation=True,
-          return_attention_mask=True,
-          return_tensors='pt',
+            text,
+            add_special_tokens=True,
+            max_length=self.max_token_len,
+            return_token_type_ids=False,
+            padding='max_length',
+            truncation=True,
+            return_attention_mask=True,
+            return_tensors='pt',
         )
-
         return {
-          'input_ids': encoding['input_ids'].flatten(),
-          'attention_mask': encoding['attention_mask'].flatten(),
-          'labels': torch.tensor(labels, dtype=torch.long)
+            'input_ids': encoding['input_ids'].flatten(),
+            'attention_mask': encoding['attention_mask'].flatten(),
+            'labels': torch.tensor(labels, dtype=torch.long)
         }
 
 train_dataset = TextDataset(train_texts, train_labels, tokenizer)
@@ -90,17 +99,23 @@ finetune_trainer = Trainer(
     eval_dataset=val_dataset,
 )
 
-# finetune_trainer.train()
 # Save the model and the tokenizer
-# fintune_model.save_pretrained('./finetuned_roberta')
-# tokenizer.save_pretrained('./finetuned_roberta')
+# finetune_trainer.train()
+fintune_model.save_pretrained('./finetuned_roberta')
+tokenizer.save_pretrained('./finetuned_roberta')
 
-# finetune_trainer.model = 
-reload ('./finetuned_roberta')
+# Reload the saved model
+def reload(model_path):
+    reloaded_model = RobertaForSequenceClassification.from_pretrained(model_path)
+    return reloaded_model
 
-predictions = finetune_trainer.predict(test_dataset) # 这里有 bug: raise KeyError(key) from err, KeyError: 0
+reloaded_model = reload('./finetuned_roberta')
+finetune_trainer.model = reloaded_model
+if finetune_trainer.model != None:
+    print("Model is reloaded successfully")
+
+predictions = finetune_trainer.predict(test_dataset)
 pred_labels = np.argmax(predictions.predictions, axis=1)
-f1 = f1_score(val_labels, pred_labels, average='weighted')
-print(f'Fine_tune F1 Score: {f1}')
 
-
+f1 = f1_score(test_labels, pred_labels, average='weighted')
+print(f'Fine_tune F1 Score: {f1}') # Fine_tune F1 Score: 0.02256115107913669
