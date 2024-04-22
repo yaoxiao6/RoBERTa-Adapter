@@ -11,25 +11,25 @@ from sklearn.model_selection import train_test_split
 import os
 from tqdm import tqdm
 
-# import wandb
-# wandb.login()
-# # start a new wandb run to track this script
-# wandb.init(
-#     # set the wandb project where this run will be logged
-#     project="my-awesome-project",
+import wandb
+wandb.login()
+# start a new wandb run to track this script
+wandb.init(
+    # set the wandb project where this run will be logged
+    project="my-awesome-project",
 
-#     # track hyperparameters and run metadata
-#     config={
-#         "learning_rate": 2e-5,
-#         "architecture": "Roberta-DAPT",
-#         "dataset": "CIFAR-100",
-#         "epochs": 3,
-#         "batch_size": 16,
-#         "num_epochs": 3,
-#         "num_classes": 7,
-#         "hidden_size": 768
-#     }
-# )
+    # track hyperparameters and run metadata
+    config={
+        "learning_rate": 2e-5,
+        "architecture": "Roberta-DAPT",
+        "dataset": "CIFAR-100",
+        "epochs": 3,
+        "batch_size": 16,
+        "num_epochs": 3,
+        "num_classes": 7,
+        "hidden_size": 768
+    }
+)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 checkpoint_dir = "./checkpoints"
@@ -60,14 +60,18 @@ for param in base_model.parameters():
 
 class TextDataset(Dataset):
     def __init__(self, texts, labels):
-        self.texts = texts
-        self.labels = labels
+        self.texts = texts # text is a pandas series
+        self.labels = labels # labels is a list
 
     def __len__(self):
         return len(self.texts)
 
     def __getitem__(self, idx):
-        return self.texts[idx], self.labels[idx]
+        # print(
+        #     "self.texts type = ", type(self.texts),
+        #     "self.labels type = ", type(self.labels),
+        # )
+        return self.texts.iloc[idx], self.labels[idx]
 
 # Example data
 # texts = ["example text 1", "example text 2", "example text 3"]
@@ -88,27 +92,28 @@ train_loader = DataLoader(train_dataset, batch_size=Config.batch_size, shuffle=T
 
 # Example test data
 test_dataset = TextDataset(test_texts, test_labels)
-print("============== aaaa =============")
-print(test_dataset.get(0))
-print("Content of test_dataset:")
-for text, label in test_dataset:
-    print(f"Text: {text}")
-    print(f"Label: {label}")
-    print("---")
-    
+# print("============== Yao print debug =============")
+# print(test_dataset)
+# print(test_dataset[0])
+# print("Content of test_dataset:")
+# for text, label in test_dataset:
+#     print(f"Text: {text}")
+#     print(f"Label: {label}")
+#     print("---")
+
 test_loader = DataLoader(test_dataset, batch_size=Config.batch_size, shuffle=False)
-print("Content of test_loader:")
-print("First 2 batches of test_loader:")
-for i, batch in enumerate(test_loader):
-    if i >= 2:
-        break
-    texts, labels = batch
-    print(f"Batch size: {len(texts)}")
-    print("Texts:")
-    for text in texts:
-        print(text)
-    print("Labels:", labels)
-    print("---")
+# print("Content of test_loader:")
+# print("First 2 batches of test_loader:")
+# for i, batch in enumerate(test_loader):
+#     if i >= 2:
+#         break
+#     texts, labels = batch
+#     print(f"Batch size: {len(texts)}")
+#     print("Texts:")
+#     for text in texts:
+#         print(text)
+#     print("Labels:", labels)
+#     print("---")
 
 class Classifier(torch.nn.Module):
     def __init__(self, hidden_size, num_classes):
@@ -168,16 +173,23 @@ def evaluate(model, classifier, dataloader, checkpoint_dir):
     classifier.eval()
     all_predictions = []
     all_labels = []
+    print("Get into with torch.no_grad()")
     with torch.no_grad():
-        for text, labels in dataloader:
+        progress_bar = tqdm(dataloader, desc="Evaluation", unit="batch")
+        print("Get into iteration")
+        for text, labels in progress_bar:
             inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True).to(device)
             labels = torch.tensor(labels).to(device)
             outputs = model(**inputs)
             cls_embeddings = outputs.hidden_states[-1][:, 0, :]
             logits = classifier(cls_embeddings)
             predictions = torch.argmax(logits, dim=1).to(device)
-            all_predictions.extend(predictions.numpy()).to(device)
+            all_predictions.extend(predictions.numpy())
             all_labels.extend(labels.numpy())
+            
+            progress_bar.set_postfix({"all_predictions": len(all_predictions)})
+
+    print("Calculating f1 score")
     f1 = f1_score(all_labels, all_predictions, average='weighted')
     print(f"Test F1 Score: {f1}")
     wandb.log({"test_f1_score": f1_score})
