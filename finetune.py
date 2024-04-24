@@ -1,27 +1,32 @@
+import os
 import pandas as pd
+import numpy as np
+
+import torch
+from torch.utils.data import Dataset, DataLoader
+from torch.optim.lr_scheduler import StepLR
+import torch.nn.functional as F
+
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score, recall_score, confusion_matrix, roc_auc_score
+
 from transformers import RobertaTokenizer, RobertaForSequenceClassification, Trainer, TrainingArguments
-from torch.utils.data import Dataset, DataLoader
-import torch
-import numpy as np
-import torch.nn.functional as F
-import os
+from transformers import AdamW
+from transformers.integrations import WandbCallback  # Import the WandbCallback
 
+import wandb
+wandb.login()
+# start a new wandb run to track this script
+wandb.init(
+    # set the wandb project where this run will be logged
+    project="my-awesome-project",
 
-# import wandb
-# wandb.login()
-# # start a new wandb run to track this script
-# wandb.init(
-#     # set the wandb project where this run will be logged
-#     project="my-awesome-project",
-
-#     # track hyperparameters and run metadata
-#     config={
-#         "Name": "RoBERTa-Adapter finetune",
-#         "dataset": "problems_and_types",
-#     }
-# )
+    # track hyperparameters and run metadata
+    config={
+        "Name": "RoBERTa-Adapter finetune",
+        "dataset": "problems_and_types",
+    }
+)
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -84,14 +89,28 @@ test_dataset = TextDataset(test_texts, test_labels, tokenizer)
 
 fintune_model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=len(label_dict))
 
+# Define the optimizer and scheduler
+optimizer = AdamW(fintune_model.parameters(), lr=0.5, eps=1e-8)
+scheduler = StepLR(optimizer, step_size=200, gamma=0.6)
+
+# Define the compute_metrics function
+def compute_metrics(eval_pred):
+    predictions, labels = eval_pred
+    pred_labels = np.argmax(predictions, axis=1)
+    f1 = f1_score(labels, pred_labels, average='weighted')
+    recall = recall_score(labels, pred_labels, average='weighted')
+    wandb.log({"eval_f1": f1, "eval_recall": recall})
+    return {"f1": f1, "recall": recall}
+
 training_args = TrainingArguments(
     output_dir='./results',
     num_train_epochs=3,
     per_device_train_batch_size=16,
-    adam_epsilon = 1e-6,
-    warmup_ratio = 0.06,
     weight_decay=0.01,
     logging_dir='./logs',
+    save_steps=200,  # Save checkpoint every 200 steps
+    logging_steps=1,  # Log loss and learning rate every step
+    report_to='wandb',  # Enable logging to wandb
 )
 
 finetune_trainer = Trainer(
@@ -99,12 +118,15 @@ finetune_trainer = Trainer(
     args=training_args,
     train_dataset=train_dataset,
     eval_dataset=val_dataset,
+    optimizers=(optimizer, scheduler),  # Pass the optimizer and scheduler
+    compute_metrics=compute_metrics,  # Pass the compute_metrics function
+    callbacks=[WandbCallback()],  # Add the WandbCallback to the callbacks list
 )
 
-# Train and Save the model and the tokenizer
-# finetune_trainer.train()
-# fintune_model.save_pretrained('./finetuned_roberta')
-# tokenizer.save_pretrained('./finetuned_roberta')
+# Train and save the model and tokenizer
+finetune_trainer.train()
+fintune_model.save_pretrained('./finetuned_roberta')
+tokenizer.save_pretrained('./finetuned_roberta')
 
 # Reload the saved model
 def reload_model(model_path):
@@ -135,18 +157,15 @@ def evaluate(predictions, test_labels):
     #  [  0   0   0   0   0   0 438]
     #  [  0   0   0   0   0   0 280]]
     print(f'Confusion Matrix:\n{cm}')
-    # auc_roc = roc_auc_score(test_labels, predictions.predictions, multi_class='ovr')
-    # print(f'AUC-ROC: {auc_roc}')
     
-    # wandb.log({
-    #     "test_f1_score": f1,
-    #     "test_recall": recall,
-    #     "test_confusion_matrix": wandb.plot.confusion_matrix(probs=None, y_true=test_labels, preds=pred_labels, class_names=label_dict.keys()),
-    #    #"test_auc_roc": auc_roc
-    # })
-    return f1, recall, cm    
-    # return f1, recall, cm, auc_roc
+    wandb.log({
+        "test_f1_score": f1,
+        "test_recall": recall,
+        "test_confusion_matrix": wandb.plot.confusion_matrix(probs=None, y_true=test_labels, preds=pred_labels, class_names=label_dict.keys()),
+    })
+    return f1, recall, cm
 
+# Reload and Eval
 reloaded_model = reload_model('./finetuned_roberta')
 finetune_trainer.model = reloaded_model
 if finetune_trainer.model is not None:
