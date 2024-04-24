@@ -124,9 +124,9 @@ finetune_trainer = Trainer(
 )
 
 # Train and save the model and tokenizer
-finetune_trainer.train()
-fintune_model.save_pretrained('./finetuned_roberta')
-tokenizer.save_pretrained('./finetuned_roberta')
+# finetune_trainer.train()
+# fintune_model.save_pretrained('./finetuned_roberta')
+# tokenizer.save_pretrained('./finetuned_roberta')
 
 # Reload the saved model
 def reload_model(model_path):
@@ -161,7 +161,7 @@ def evaluate(predictions, test_labels):
     wandb.log({
         "test_f1_score": f1,
         "test_recall": recall,
-        "test_confusion_matrix": wandb.plot.confusion_matrix(probs=None, y_true=test_labels, preds=pred_labels, class_names=label_dict.keys()),
+        "test_confusion_matrix": wandb.plot.confusion_matrix(probs=None, y_true=test_labels, preds=pred_labels, class_names=list(label_dict.keys())),
     })
     return f1, recall, cm
 

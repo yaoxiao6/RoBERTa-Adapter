@@ -1,4 +1,4 @@
-/* DAPT.py */
+### DAPT.py ###
 
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -168,27 +168,15 @@ def train(model, classifier, dataloader, optimizer, scheduler):
             global_step += 1
         
         save_checkpoint(model, classifier, optimizer, scheduler, epoch + 1, checkpoint_dir)
-        
-        
-def evaluate(model, classifier, dataloader, checkpoint_dir):
-    checkpoint_path = check_checkpoint(checkpoint_dir)
-    if checkpoint_path:
-        print(f"Loading checkpoint from: {checkpoint_path}")
-        checkpoint = torch.load(checkpoint_path)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        classifier.load_state_dict(checkpoint['classifier_state_dict'])
-        print("Model and classifier loaded from checkpoint.")
-    else:
-        print("No checkpoint found. Using the current model and classifier.")
-    
+
+
+def predict(model, classifier, dataloader):
     model.eval()
     classifier.eval()
     all_predictions = []
     all_labels = []
-    print("Preprocessing predictions and labels")
     with torch.no_grad():
-        progress_bar = tqdm(dataloader, desc="Evaluation", unit="batch")
-        print("Get into iteration")
+        progress_bar = tqdm(dataloader, desc="Prediction", unit="batch")
         for text, labels in progress_bar:
             inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True).to(device)
             labels = torch.tensor(labels).to(device)
@@ -200,24 +188,46 @@ def evaluate(model, classifier, dataloader, checkpoint_dir):
             all_labels.extend(labels.cpu().numpy())
             
             progress_bar.set_postfix({"all_predictions": len(all_predictions)})
-            # print("Debugging --> I am here")
+    
+    return all_labels, all_predictions
 
-    print("Calculating metrics")
+def evaluate(all_labels, all_predictions):
     f1 = f1_score(all_labels, all_predictions, average='weighted')
     print(f"Test F1 Score: {f1}")
     recall = recall_score(all_labels, all_predictions, average='weighted')
     print(f"Test Recall: {recall}")
     cm = confusion_matrix(all_labels, all_predictions)
     print(f"Confusion Matrix:\n{cm}")
-    # auc_roc = roc_auc_score(all_labels, all_predictions, multi_class='ovr')
-    # print(f"AUC-ROC: {auc_roc}")
     
     wandb.log({
         "test_f1_score": f1,
         "test_recall": recall,
-        "test_confusion_matrix": wandb.plot.confusion_matrix(probs=None, y_true=all_labels, preds=all_predictions, class_names=label_dict.keys()),
-        # "test_auc_roc": auc_roc
+        "test_confusion_matrix": wandb.plot.confusion_matrix(probs=None, y_true=all_labels, preds=all_predictions, class_names=list(label_dict.keys())),
     })
+    return f1, recall, cm
 
-train(base_model, classifier, train_loader, optimizer, scheduler)
-evaluate(base_model, classifier, test_loader, checkpoint_dir)
+
+# reload the model and classifier
+checkpoint_path = check_checkpoint(checkpoint_dir)
+if checkpoint_path:
+    print(f"Loading checkpoint from: {checkpoint_path}")
+    model, classifier, _, _, _ = load_checkpoint(base_model, classifier, optimizer, scheduler, checkpoint_path)
+    print("Model and classifier loaded from checkpoint.")
+else:
+    raise ValueError("No checkpoint found. Please train the model first.")
+# train(base_model, classifier, train_loader, optimizer, scheduler)
+
+
+# Reload predictions
+if os.path.exists('all_labels.pt') and os.path.exists('all_predictions.pt'):
+    print("Loading predictions from files...")
+    all_labels = torch.load('all_labels.pt')
+    all_predictions = torch.load('all_predictions.pt')
+else:
+    print("Running predictions...")
+    all_labels, all_predictions = predict(model, classifier, test_loader)
+    torch.save(all_labels, 'all_labels.pt')
+    torch.save(all_predictions, 'all_predictions.pt')
+
+# evaluate
+evaluate(all_labels, all_predictions)
