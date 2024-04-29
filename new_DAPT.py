@@ -1,18 +1,20 @@
 ### DAPT.py ###
 
-import torch
-from torch.utils.data import DataLoader, Dataset
-from transformers import AutoModel, AutoTokenizer
-import torch.optim as optim
-import torch.nn.functional as F
-from sklearn.metrics import f1_score, recall_score, confusion_matrix, roc_auc_score
-import numpy as np
-from util import save_checkpoint, load_checkpoint, check_checkpoint
-import pandas as pd
-from sklearn.model_selection import train_test_split
 import os
 from tqdm import tqdm
+import pandas as pd
+import numpy as np
+
+from transformers import AutoModel, AutoTokenizer
+from sklearn.metrics import f1_score, recall_score, confusion_matrix, roc_auc_score
+from sklearn.model_selection import train_test_split
+from util import save_checkpoint, load_checkpoint, check_checkpoint
+
+import torch
+import torch.optim as optim
+import torch.nn.functional as F
 import torch.optim.lr_scheduler as lr_scheduler
+from torch.utils.data import DataLoader, Dataset
 
 import wandb
 wandb.login()
@@ -56,11 +58,6 @@ class Config:
 #     base_model = AutoModel.from_pretrained(Config.model_name, output_hidden_states=True).to(device)
 # except OSError:
 # print(f"Warning: {Config.model_name} not found or missing required files. Using {Config.fallback_model_name} as a fallback.")
-tokenizer = AutoTokenizer.from_pretrained(Config.fallback_model_name)
-base_model = AutoModel.from_pretrained(Config.fallback_model_name, output_hidden_states=True).to(device)
-
-for param in base_model.parameters():
-    param.requires_grad = False
 tokenizer = AutoTokenizer.from_pretrained(Config.fallback_model_name)
 base_model = AutoModel.from_pretrained(Config.fallback_model_name, output_hidden_states=True).to(device)
 for param in base_model.parameters():
