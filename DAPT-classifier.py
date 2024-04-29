@@ -1,4 +1,4 @@
-### DAPT.py ###
+### DAPT_classifier.py ###
 
 import os
 from tqdm import tqdm
@@ -28,7 +28,6 @@ wandb.init(
         "architecture": "Roberta-DAPT",
         "dataset": "CIFAR-100",
         "model_name": "./domain_adapted_roberta",
-        "fallback_model_name": "roberta-base",
         "initial_learning_rate": 0.5,
         "batch_size": 16,
         "num_epochs": 3,
@@ -40,11 +39,11 @@ wandb.init(
 )
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-checkpoint_dir = "./checkpoints/checkpoints-DAPT-run3"
+checkpoint_dir = "./checkpoints/checkpoints-DAPT-run4"
+checkpoint_path = check_checkpoint(checkpoint_dir)
 
 class Config:
-    model_name = "./domain_adapted_roberta"
-    fallback_model_name = "roberta-base"
+    model_name = "./DAPT_roberta"
     initial_learning_rate = 0.5
     batch_size = 16
     num_epochs = 3
@@ -53,14 +52,8 @@ class Config:
     scheduler_step_size = 200
     scheduler_gamma = 0.6
 
-try:
-    tokenizer = AutoTokenizer.from_pretrained(Config.model_name)
-    base_model = AutoModel.from_pretrained(Config.model_name, output_hidden_states=True).to(device)
-except OSError:
-    print(f"Warning: {Config.model_name} not found or missing required files. Using {Config.fallback_model_name} as a fallback.")
-    tokenizer = AutoTokenizer.from_pretrained(Config.fallback_model_name)
-    base_model = AutoModel.from_pretrained(Config.fallback_model_name, output_hidden_states=True).to(device)
-
+tokenizer = AutoTokenizer.from_pretrained(Config.model_name)
+base_model = AutoModel.from_pretrained(Config.model_name, output_hidden_states=True).to(device)
 for param in base_model.parameters():
     param.requires_grad = False
 
@@ -206,6 +199,7 @@ def evaluate(all_labels, all_predictions):
 
 
 # reload the model and classifier
+train(base_model, classifier, train_loader, optimizer, scheduler)
 checkpoint_path = check_checkpoint(checkpoint_dir)
 if checkpoint_path:
     print(f"Loading checkpoint from: {checkpoint_path}")
@@ -213,19 +207,20 @@ if checkpoint_path:
     print("Model and classifier loaded from checkpoint.")
 else:
     raise ValueError("No checkpoint found. Please train the model first.")
-# train(base_model, classifier, train_loader, optimizer, scheduler)
 
 
 # Reload predictions
-if os.path.exists('all_labels.pt') and os.path.exists('all_predictions.pt'):
+all_labels_path = os.path.join(checkpoint_dir, "all_labels.pt")
+all_predictions_path = os.path.join(checkpoint_dir, "all_predictions.pt")
+if os.path.exists(all_labels_path) and os.path.exists(all_predictions_path):
     print("Loading predictions from files...")
-    all_labels = torch.load('all_labels.pt')
-    all_predictions = torch.load('all_predictions.pt')
+    all_labels = torch.load(all_labels_path)
+    all_predictions = torch.load(all_predictions_path)
 else:
     print("Running predictions...")
     all_labels, all_predictions = predict(model, classifier, test_loader)
-    torch.save(all_labels, 'all_labels.pt')
-    torch.save(all_predictions, 'all_predictions.pt')
+    torch.save(all_labels, all_labels_path)
+    torch.save(all_predictions, all_predictions_path)
 
 # evaluate
 evaluate(all_labels, all_predictions)

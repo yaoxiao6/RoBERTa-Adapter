@@ -28,7 +28,6 @@ wandb.init(
         "architecture": "Roberta-DAPT",
         "dataset": "CIFAR-100",
         "model_name": "./domain_adapted_roberta",
-        "fallback_model_name": "roberta-base",
         "initial_learning_rate": 0.5,
         "batch_size": 16,
         "num_epochs": 3,
@@ -40,12 +39,11 @@ wandb.init(
 )
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-checkpoint_dir = "./checkpoints/checkpoints-TAPT-run1"
+checkpoint_dir = "./checkpoints/checkpoints-TAPT-run2"
 checkpoint_path = check_checkpoint(checkpoint_dir)
 
 class Config:
     model_name = "./TATP_roberta"
-    fallback_model_name = "roberta-base"
     initial_learning_rate = 0.5
     batch_size = 16
     num_epochs = 3
@@ -54,13 +52,8 @@ class Config:
     scheduler_step_size = 200
     scheduler_gamma = 0.6
 
-try:
-    tokenizer = AutoTokenizer.from_pretrained(Config.model_name)
-    base_model = AutoModel.from_pretrained(Config.model_name, output_hidden_states=True).to(device)
-except OSError:
-    print(f"Warning: {Config.model_name} not found or missing required files. Using {Config.fallback_model_name} as a fallback.")
-    tokenizer = AutoTokenizer.from_pretrained(Config.fallback_model_name)
-    base_model = AutoModel.from_pretrained(Config.fallback_model_name, output_hidden_states=True).to(device)
+tokenizer = AutoTokenizer.from_pretrained(Config.model_name)
+base_model = AutoModel.from_pretrained(Config.model_name, output_hidden_states=True).to(device)
 for param in base_model.parameters():
     param.requires_grad = False
 
@@ -206,7 +199,7 @@ def evaluate(all_labels, all_predictions):
 
 
 # reload the model and classifier
-# train(base_model, classifier, train_loader, optimizer, scheduler)
+train(base_model, classifier, train_loader, optimizer, scheduler)
 checkpoint_path = check_checkpoint(checkpoint_dir)
 if checkpoint_path:
     print(f"Loading checkpoint from: {checkpoint_path}")
